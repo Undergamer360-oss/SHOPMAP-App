@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AppText } from '@/components/ui/text';
 import { resetSetup, setThemePreference, useSetup, type Address } from '@/state/setup-store';
@@ -23,6 +25,8 @@ export default function ProfileScreen() {
   const { profile, settings } = useSetup();
   const { colors } = useAppTheme();
   const router = useRouter();
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   if (!profile) {
     return null;
@@ -34,22 +38,15 @@ export default function ProfileScreen() {
     year: 'numeric',
   });
 
-  function handleReset() {
-    Alert.alert(
-      'Reset setup?',
-      'This removes your profile and returns you to the welcome screen.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: async () => {
-            await resetSetup();
-            router.replace('/welcome');
-          },
-        },
-      ]
-    );
+  async function handleReset() {
+    setResetting(true);
+    try {
+      await resetSetup();
+      router.replace('/welcome');
+    } finally {
+      setResetting(false);
+      setConfirmingReset(false);
+    }
   }
 
   return (
@@ -125,19 +122,44 @@ export default function ProfileScreen() {
         </View>
       </Card>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Reset setup"
-        onPress={handleReset}
-        style={({ pressed }) => [
-          styles.reset,
-          { backgroundColor: colors.dangerSoft },
-          pressed && styles.pressed,
-        ]}>
-        <AppText variant="label" color="danger">
-          Reset setup
-        </AppText>
-      </Pressable>
+      {confirmingReset ? (
+        <Card>
+          <AppText variant="headline">Reset setup?</AppText>
+          <AppText color="textSecondary">
+            This removes your profile, your address and your saved password, then returns you to the
+            welcome screen.
+          </AppText>
+          <View style={styles.confirmActions}>
+            <Button
+              label="Cancel"
+              variant="secondary"
+              onPress={() => setConfirmingReset(false)}
+              style={styles.confirmButton}
+            />
+            <Button
+              label="Reset"
+              variant="danger"
+              onPress={handleReset}
+              loading={resetting}
+              style={styles.confirmButton}
+            />
+          </View>
+        </Card>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reset setup"
+          onPress={() => setConfirmingReset(true)}
+          style={({ pressed }) => [
+            styles.reset,
+            { backgroundColor: colors.dangerSoft },
+            pressed && styles.pressed,
+          ]}>
+          <AppText variant="label" color="danger">
+            Reset setup
+          </AppText>
+        </Pressable>
+      )}
 
       <AppText variant="caption" color="textTertiary" style={styles.version}>
         SHOPMAP 1.0.0
@@ -198,6 +220,14 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  confirmButton: {
+    flex: 1,
   },
   pressed: {
     opacity: 0.8,
