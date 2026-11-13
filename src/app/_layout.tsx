@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useSetup } from '@/state/setup-store';
 import { AppThemeProvider, useAppTheme } from '@/theme/theme-provider';
@@ -48,8 +49,10 @@ export default function RootLayout() {
   const { settings } = useSetup();
 
   return (
-    <AppThemeProvider preference={settings.theme}>
-      <RootNavigator />
-    </AppThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppThemeProvider preference={settings.theme}>
+        <RootNavigator />
+      </AppThemeProvider>
+    </GestureHandlerRootView>
   );
 }

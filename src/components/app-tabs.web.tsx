@@ -10,6 +10,7 @@ import { Spacing } from '@/theme/tokens';
 const items = [
   { href: '/home', label: 'Home', sf: 'house.fill', md: 'home' },
   { href: '/map', label: 'Map', sf: 'map.fill', md: 'map' },
+  { href: '/search', label: 'Search', sf: 'magnifyingglass', md: 'search' },
   { href: '/saved', label: 'Saved', sf: 'bookmark.fill', md: 'bookmark' },
   { href: '/profile', label: 'Profile', sf: 'person.fill', md: 'person' },
 ] as const;

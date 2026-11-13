@@ -20,6 +20,11 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon sf="map.fill" md="map" />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="search">
+        <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="magnifyingglass" md="search" />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="saved">
         <NativeTabs.Trigger.Label>Saved</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="bookmark.fill" md="bookmark" />
