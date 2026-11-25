@@ -13,6 +13,7 @@ import { StoreMap } from '@/components/store-map';
 import { Button } from '@/components/ui/button';
 import { AppText } from '@/components/ui/text';
 import { directionsForLeg } from '@/data/directions';
+import { storeLayout } from '@/data/layout';
 import { formatDistance, type RoutePoint, type RouteStop } from '@/data/route';
 import {
   clearNavigation,
@@ -452,7 +453,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   mapWrap: {
-    height: 340,
+    aspectRatio: storeLayout.width / storeLayout.height,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
     overflow: 'hidden',

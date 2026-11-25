@@ -108,7 +108,11 @@ export default function MapScreen() {
         </ScrollView>
       </View>
 
-      <View style={styles.mapWrap}>
+      <View
+        style={[
+          styles.mapWrap,
+          { borderColor: colors.border, backgroundColor: colors.surfaceMuted },
+        ]}>
         <StoreMap
           highlightedDepartmentId={departmentId}
           selectedAisleId={selectedAisle?.id ?? null}
@@ -116,27 +120,65 @@ export default function MapScreen() {
           resetKey={resetKey}
         />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Reset map view"
-          onPress={() => setResetKey((value) => value + 1)}
-          style={[styles.fitButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Icon sf="arrow.up.left.and.arrow.down.right" md="zoom-out-map" size={18} color={colors.text} />
-        </Pressable>
+      </View>
 
-        {!selectedAisle ? (
+      {!selectedAisle ? (
+        <>
+          <View style={styles.hintRow}>
+            <AppText variant="caption" color="textTertiary" style={styles.hint}>
+              Tap a shelf to browse · pinch to zoom
+            </AppText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Reset map view"
+              onPress={() => setResetKey((value) => value + 1)}
+              style={[
+                styles.fitButton,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}>
+              <Icon
+                sf="arrow.up.left.and.arrow.down.right"
+                md="zoom-out-map"
+                size={16}
+                color={colors.text}
+              />
+            </Pressable>
+          </View>
+
           <View
             style={[
-              styles.hint,
+              styles.overview,
               { backgroundColor: colors.surface, borderColor: colors.border },
             ]}>
-            <AppText variant="caption" color="textSecondary">
-              {storeStats.aisleCount} shelves · {storeLayout.aisleCount} numbered aisles · pinch to
-              zoom
-            </AppText>
+            <View style={styles.overviewHeader}>
+              <AppText variant="label">STORE OVERVIEW</AppText>
+              <AppText variant="caption" color="textTertiary">
+                at a glance
+              </AppText>
+            </View>
+            <View style={styles.stats}>
+              <View style={styles.stat}>
+                <AppText variant="headline">{storeStats.aisleCount}</AppText>
+                <AppText variant="caption" color="textTertiary">
+                  shelves
+                </AppText>
+              </View>
+              <View style={styles.stat}>
+                <AppText variant="headline">{storeLayout.aisleCount}</AppText>
+                <AppText variant="caption" color="textTertiary">
+                  numbered aisles
+                </AppText>
+              </View>
+              <View style={styles.stat}>
+                <AppText variant="headline">{storeStats.productCount.toLocaleString()}</AppText>
+                <AppText variant="caption" color="textTertiary">
+                  products
+                </AppText>
+              </View>
+            </View>
           </View>
-        ) : null}
-      </View>
+        </>
+      ) : null}
 
       {selectedAisle ? (
         <View
@@ -169,7 +211,10 @@ export default function MapScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.products}>
+          <ScrollView
+            style={styles.productScroll}
+            contentContainerStyle={styles.products}
+            showsVerticalScrollIndicator={false}>
             {preview.map((product) => (
               <View key={product.name} style={styles.productRow}>
                 <AppText variant="callout" color="textSecondary" numberOfLines={1} style={styles.productName}>
@@ -180,7 +225,7 @@ export default function MapScreen() {
                 </AppText>
               </View>
             ))}
-          </View>
+          </ScrollView>
 
           {totalInAisle > preview.length ? (
             <AppText variant="caption" color="textTertiary">
@@ -221,31 +266,57 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   mapWrap: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.sm,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    padding: Spacing.sm,
+    aspectRatio: storeLayout.width / storeLayout.height,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
   },
   fitButton: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.xl,
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: Radius.pill,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   hint: {
-    position: 'absolute',
-    top: Spacing.sm,
-    left: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
+    flex: 1,
+  },
+  overview: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
     borderWidth: 1,
+    gap: Spacing.md,
+  },
+  overviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stats: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  stat: {
+    flex: 1,
+    gap: 2,
   },
   sheet: {
+    flexShrink: 1,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
@@ -269,6 +340,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  productScroll: {
+    flexShrink: 1,
   },
   products: {
     gap: 3,

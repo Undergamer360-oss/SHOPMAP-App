@@ -1,5 +1,10 @@
 import { departments, type Department } from '@/data/catalog';
-import { METRES_PER_MAP_UNIT, storeLayout } from '@/data/layout';
+import {
+  COUNTER_DEPTH,
+  MARGIN,
+  METRES_PER_MAP_UNIT,
+  storeLayout,
+} from '@/data/layout';
 
 /**
  * Route planning for the virtual store.
@@ -135,6 +140,69 @@ function pointForCell(cell: number): RoutePoint {
   };
 }
 
+type ShelfRect = { x: number; y: number; width: number; height: number };
+
+/**
+ * A shopper reaches into the long face of a shelf, never round a short end.
+ * Anchor each department in the walkway beside its accessible face:
+ * - back-wall counters open towards the aisle below them;
+ * - left-wall counters open to the right, right-wall counters to the left;
+ * - centre gondolas open on the side nearest the middle of the store.
+ *
+ * Several samples along the face are tried, so a rounded grid cell that still
+ * overlaps the shelf cannot push the stop round the corner.
+ */
+function departmentStopCell(shelf: ShelfRect): number {
+  const backWall = shelf.y < MARGIN + COUNTER_DEPTH;
+  const leftWall = shelf.x < MARGIN + COUNTER_DEPTH;
+  const rightWall =
+    shelf.x + shelf.width > storeLayout.width - MARGIN - COUNTER_DEPTH;
+
+  const horizontal = backWall;
+  const length = horizontal ? shelf.width : shelf.height;
+  const start = horizontal ? shelf.x : shelf.y;
+
+  let outwardX = 0;
+  let outwardY = 0;
+
+  if (backWall) {
+    outwardY = 1;
+  } else if (leftWall) {
+    outwardX = 1;
+  } else if (rightWall) {
+    outwardX = -1;
+  } else {
+    outwardX = shelf.x + shelf.width / 2 < storeLayout.width / 2 ? 1 : -1;
+  }
+
+  // Middle of the face first, then further out towards its ends.
+  const fractions = [0.5, 0.36, 0.64, 0.22, 0.78, 0.1, 0.9];
+
+  for (const distance of [1.1, 1.7, 2.3]) {
+    for (const fraction of fractions) {
+      const edgeX = horizontal
+        ? start + length * fraction
+        : shelf.x + (outwardX > 0 ? shelf.width : 0);
+      const edgeY = horizontal
+        ? shelf.y + shelf.height
+        : start + length * fraction;
+
+      const x = Math.round(edgeX + outwardX * distance);
+      const y = Math.round(edgeY + outwardY * distance);
+
+      if (isWalkable(x, y)) return cellIndex(x, y);
+    }
+  }
+
+  // Fallback: nearest walkable cell to the middle of the accessible face.
+  return nearestWalkableCell(
+    horizontal
+      ? shelf.x + shelf.width / 2
+      : shelf.x + shelf.width / 2 + outwardX * 1.1,
+    horizontal ? shelf.y + shelf.height + 1.1 : shelf.y + shelf.height / 2
+  );
+}
+
 type Graph = {
   /** One node per department, plus entrance at 0 and checkout at the end. */
   cells: number[];
@@ -176,12 +244,7 @@ function getGraph(): Graph {
 
     departmentNode.set(department.id, cells.length);
     departmentShelf.set(department.id, largest);
-    cells.push(
-      nearestWalkableCell(
-        largest.x + largest.width / 2,
-        largest.y + largest.height / 2
-      )
-    );
+    cells.push(departmentStopCell(largest));
   }
 
   const lane = storeLayout.checkouts[Math.floor(storeLayout.checkouts.length / 2)];

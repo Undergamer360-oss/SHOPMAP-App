@@ -7,6 +7,7 @@ import { StoreMap } from '@/components/store-map';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { AppText } from '@/components/ui/text';
+import { storeLayout } from '@/data/layout';
 import { useAppTheme } from '@/theme/theme-provider';
 import { Radius, Spacing } from '@/theme/tokens';
 import { formatDistance, formatDuration } from '@/data/route';
@@ -221,7 +222,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   mapWrap: {
-    height: 460,
+    aspectRatio: storeLayout.width / storeLayout.height,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
     overflow: 'hidden',

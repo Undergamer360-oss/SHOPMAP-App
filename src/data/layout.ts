@@ -6,17 +6,16 @@ import { aislesByDepartment, departments, type Aisle } from '@/data/catalog';
  *
  * The catalog is a taxonomy, not geometry, so the map is *generated*: the same
  * input always produces the same floor plan. One map unit is 0.5 m, so the
- * finished store is 41.5 x 58 m. Shelves are 1 m deep, shopping aisles are
- * 1.5 m wide, and the centre-to-centre aisle pitch is 2.5 m — realistic sizes
- * for a small neighbourhood supermarket.
+ * finished store is a wide 56 x 43 m floor plan. Shelves are 1 m deep and the
+ * shopping aisles are 2.25 m wide, leaving room for trolleys to pass.
  *
- * Shape of the store, back to front:
- * - service counters along the back and side walls for the departments people
- *   walk the perimeter for (meat & seafood, dairy, deli, frozen)
- * - three blocks of long parallel gondolas with numbered aisles, separated by
- *   cross aisles and a wide action alley
- * - bakery and produce counters, two banks of checkout lanes and the entrance
- *   at the front, where shoppers actually come in
+ * Shape of the store, based on the paper-map reference:
+ * - a full-width row of service departments along the back wall
+ * - frozen and drinks counters down the left, produce and bulk down the right
+ * - long, unbroken vertical gondola runs through the middle
+ * - one long checkout counter across the front
+ * - the entrance at the front-right, so every route starts at the bottom-right
+ *   and finishes at the checkout
  */
 
 /** Merchandising order for the centre-store aisles; unknown names fall to the end. */
@@ -48,25 +47,25 @@ const DEPARTMENT_ORDER = [
 export const METRES_PER_MAP_UNIT = 0.5;
 
 export const GONDOLA_WIDTH = 2;
-export const CORRIDOR_WIDTH = 3;
+export const CORRIDOR_WIDTH = 4.5;
 export const AISLE_PITCH = GONDOLA_WIDTH + CORRIDOR_WIDTH;
 export const COUNTER_DEPTH = 6;
 export const WALKWAY = 4;
 export const MARGIN = 3;
 
-const BLOCK_COUNT = 3;
-const BLOCK_HEIGHT = 20;
+/** One continuous gondola run per numbered aisle, with no cross-aisle cuts. */
+const BLOCK_COUNT = 1;
+const BLOCK_HEIGHT = 55;
 const CROSS_AISLE = 5;
-const ACTION_ALLEY = 8;
-const FRONT_COUNTER_HEIGHT = 5;
-const CHECKOUT_BAND = 8;
-const ENTRANCE_BAND = 8;
+const ACTION_ALLEY = 5;
+const FRONT_COUNTER_HEIGHT = 0;
+const CHECKOUT_BAND = 5;
+const ENTRANCE_BAND = 4;
 const ENTRANCE_GAP = 12;
-/** Target number of shelf sections per aisle band. */
-const SECTIONS_PER_BAND = 2.6;
-const CHECKOUT_LANES_PER_BANK = 3;
-const CHECKOUT_LANE_WIDTH = 4.5;
-const CHECKOUT_LANE_GAP = 1.2;
+/** Route the shopper starts inside the doors, clear of the bottom corner. */
+const ENTRANCE_INSET = 3;
+/** Target number of shelf sections in a whole aisle. */
+const SECTIONS_PER_AISLE = 6;
 /** One slot is the smallest addressable point on a shelf. */
 const PRODUCTS_PER_SLOT = 25;
 
@@ -145,20 +144,29 @@ type PerimeterGroup = {
 
 /** Where the perimeter departments live; everything else goes to the centre. */
 const PERIMETER_GROUPS: PerimeterGroup[] = [
-  { department: 'meat seafood', wall: 'back', from: 0, to: 1 },
-  { department: 'dairy eggs', wall: 'right', from: 0, to: 1 },
-  { department: 'deli', wall: 'left', from: 0, to: 0.28 },
-  { department: 'frozen', wall: 'left', from: 0.28, to: 1 },
-  { department: 'bakery', wall: 'front', from: 0, to: 0.42 },
-  { department: 'produce', wall: 'front', from: 0.58, to: 1 },
+  { department: 'dairy eggs', wall: 'back', from: 0.01, to: 0.24 },
+  { department: 'meat seafood', wall: 'back', from: 0.25, to: 0.49 },
+  { department: 'deli', wall: 'back', from: 0.5, to: 0.74 },
+  { department: 'bakery', wall: 'back', from: 0.76, to: 0.99 },
+  { department: 'frozen', wall: 'left', from: 0.02, to: 0.62 },
+  { department: 'alcohol', wall: 'left', from: 0.66, to: 0.98 },
+  { department: 'produce', wall: 'right', from: 0.02, to: 0.58 },
+  { department: 'bulk', wall: 'right', from: 0.62, to: 0.84 },
 ];
 
 /** Short, shelf-sign sized names; long names shrink instead of wrapping. */
 const LABEL_TEXT: Record<string, string> = {
-  'dairy eggs': 'DAIRY',
+  'dairy eggs': 'EGGS · BUTTER · MILK',
   'meat seafood': 'MEAT & SEAFOOD',
-  'dry goods pasta': 'PASTA',
-  'canned goods': 'CANNED',
+  alcohol: 'WINE & SPIRITS',
+  produce: 'FRESH PRODUCE',
+  beverages: 'BEVERAGES · WATER',
+  breakfast: 'COFFEE · TEA · CEREAL',
+  pantry: 'BAKING · SPICES · OIL',
+  'canned goods': 'CANNED GOODS · GRAINS',
+  'dry goods pasta': 'PASTA · GRAINS',
+  snacks: 'CHIPS · SNACKS',
+  'dry goods': 'DRY GOODS',
   'personal care': 'PERSONAL CARE',
   missing: 'GENERAL',
   other: 'OTHER',
@@ -261,14 +269,13 @@ function buildLayout(): StoreLayout {
     .filter((department) => !perimeterNames.has(department.name))
     .flatMap((department) => departmentAisles(department.id));
 
-  // One column is one numbered aisle, cut into bands by the cross aisles.
-  // The centre store is filled column by column, so each aisle runs the full
-  // depth of the store and holds a contiguous stretch of departments.
-  // Roughly three shelf sections per band keeps the aisles looking stocked
-  // rather than empty.
+  // One column is one numbered aisle, a single unbroken gondola run from the
+  // back walkway to the action alley. The centre store is filled column by
+  // column, so each aisle runs the full depth of the store and holds a
+  // contiguous stretch of departments.
   const columns = Math.max(
     1,
-    Math.round(centreAisles.length / (BLOCK_COUNT * SECTIONS_PER_BAND))
+    Math.round(centreAisles.length / (BLOCK_COUNT * SECTIONS_PER_AISLE))
   );
   const centreColumnChunks = splitEvenly(centreAisles, columns);
   const centreWidth = columns * AISLE_PITCH - CORRIDOR_WIDTH;
@@ -276,7 +283,6 @@ function buildLayout(): StoreLayout {
 
   const width = centreWidth + sideBand * 2;
   const centreLeft = sideBand;
-  const centreRight = centreLeft + centreWidth;
 
   const contentTop = MARGIN + COUNTER_DEPTH + WALKWAY;
   const contentBottom =
@@ -325,9 +331,11 @@ function buildLayout(): StoreLayout {
 
     let rect: Rect;
     if (group.wall === 'back' || group.wall === 'front') {
-      const span = centreRight - centreLeft;
+      // The back wall is one full-width run of service departments, like the
+      // coloured blocks across the top of a paper store map.
+      const span = width - MARGIN * 2;
       rect = {
-        x: centreLeft + span * group.from,
+        x: MARGIN + span * group.from,
         y: group.wall === 'back' ? MARGIN : frontCounterY,
         width: span * (group.to - group.from),
         height: group.wall === 'back' ? COUNTER_DEPTH : FRONT_COUNTER_HEIGHT,
@@ -376,10 +384,9 @@ function buildLayout(): StoreLayout {
     });
   }
 
-  // Centre store: numbered columns of gondolas running the full depth of the
-  // store, cut into bands by the cross aisles. A column is one numbered aisle:
-  // the same number hangs at both ends of it, the way aisle signs work in a
-  // real store.
+  // Centre store: numbered columns of gondolas running unbroken from the back
+  // walkway to the action alley. A column is one numbered aisle, and its
+  // number sits at the front where shoppers enter it.
   //
   // Aisles are filled column by column, front to back, so a department
   // occupies a tall stripe of shelving instead of being scattered around the
@@ -456,21 +463,15 @@ function buildLayout(): StoreLayout {
     });
   });
 
-  // Aisle numbers repeat at the end of every band, the way hanging signs do.
+  // One number per aisle, in the front action alley where shoppers enter the
+  // centre store.
   const aisleMarkers: AisleMarker[] = [];
-  for (let block = 0; block < BLOCK_COUNT; block += 1) {
-    const isFrontBlock = block === 0;
-    const y = isFrontBlock
-      ? contentBottom + ACTION_ALLEY / 2
-      : blockTop(block) + BLOCK_HEIGHT + CROSS_AISLE / 2;
-
-    for (let column = 0; column < columns; column += 1) {
-      aisleMarkers.push({
-        number: column + 1,
-        x: centreLeft + column * AISLE_PITCH + GONDOLA_WIDTH / 2,
-        y,
-      });
-    }
+  for (let column = 0; column < columns; column += 1) {
+    aisleMarkers.push({
+      number: column + 1,
+      x: centreLeft + column * AISLE_PITCH + GONDOLA_WIDTH / 2,
+      y: contentBottom + ACTION_ALLEY / 2,
+    });
   }
 
   const walkways: Rect[] = [];
@@ -509,29 +510,26 @@ function buildLayout(): StoreLayout {
     height: ACTION_ALLEY,
   });
 
-  // Two banks of checkout lanes, with the entrance between them.
-  const bankWidth =
-    CHECKOUT_LANES_PER_BANK * CHECKOUT_LANE_WIDTH +
-    (CHECKOUT_LANES_PER_BANK - 1) * CHECKOUT_LANE_GAP;
-  const leftBankX = centreLeft;
-  const rightBankX = centreRight - bankWidth;
+  // One long checkout counter across the front, offset slightly left so the
+  // entrance stays clear on the right and the route can finish on the left.
+  const checkoutWidth = centreWidth * 0.66;
+  const checkoutX = centreLeft + (centreWidth - checkoutWidth) * 0.3;
 
-  const checkouts: Rect[] = [];
-  for (const bankX of [leftBankX, rightBankX]) {
-    for (let lane = 0; lane < CHECKOUT_LANES_PER_BANK; lane += 1) {
-      checkouts.push({
-        x: bankX + lane * (CHECKOUT_LANE_WIDTH + CHECKOUT_LANE_GAP),
-        y: checkoutY,
-        width: CHECKOUT_LANE_WIDTH,
-        height: CHECKOUT_BAND,
-      });
-    }
-  }
+  const checkouts: Rect[] = [
+    {
+      x: checkoutX,
+      y: checkoutY,
+      width: checkoutWidth,
+      height: CHECKOUT_BAND,
+    },
+  ];
 
-  const checkoutLabels = [leftBankX + bankWidth / 2, rightBankX + bankWidth / 2].map((x) => ({
-    x,
-    y: checkoutY - 1.8,
-  }));
+  const checkoutLabels = [
+    {
+      x: checkoutX + checkoutWidth / 2,
+      y: checkoutY - 1.8,
+    },
+  ];
 
   // Name each department once, on the longest run it owns, so the name is
   // readable and the rest of the department's shelving stays plain.
@@ -570,7 +568,11 @@ function buildLayout(): StoreLayout {
     aisleMarkers,
     checkouts,
     checkoutLabels,
-    entrance: { x: width / 2, y: height - MARGIN, width: entranceWidth },
+    entrance: {
+      x: width - MARGIN - entranceWidth / 2,
+      y: height - MARGIN - ENTRANCE_INSET,
+      width: entranceWidth,
+    },
     aisleCount: columns,
   };
 }

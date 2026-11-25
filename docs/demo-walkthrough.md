@@ -28,8 +28,8 @@ Home opens straight onto the **SHOPMAP DEMO** wordmark with a five-item thumbnai
 
 ## Store model
 
-- Store: **41.5 × 58 m** (83 × 116 map units at 0.5 m per unit).
-- Shelves: **1 m** deep; walking aisles **1.5 m** wide; centre-to-centre aisle pitch **2.5 m**.
+- Store: **56.25 × 43 m** (112.5 × 86 map units at 0.5 m per unit), with the entrance at the front-right.
+- Shelves: **1 m** deep; walking aisles **2.25 m** wide; centre-to-centre aisle pitch **3.25 m**.
 - Walking speed: 1.2 m/s, plus 20 s at each stop.
 - Routing grid blocks every shelf, so no leg crosses a gondola.
 - Every plan starts at the entrance marker and ends at checkout.

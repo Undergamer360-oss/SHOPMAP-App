@@ -9,7 +9,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, G, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import type { Aisle } from '@/data/catalog';
 import { storeLayout } from '@/data/layout';
@@ -21,7 +21,8 @@ const MIN_SCALE = 1;
 const MAX_SCALE = 7;
 
 const WALL_WIDTH = 1.4;
-const DIVIDER_WIDTH = 0.18;
+/** Radius of a route corner, in map units. */
+const CORNER_RADIUS = 1.5;
 
 /**
  * `onPress` on an SVG shape turns on react-native-svg's port of the legacy
@@ -37,6 +38,45 @@ function hitHandlers(onSelect: () => void) {
   }
 
   return { onPress: onSelect };
+}
+
+/**
+ * Builds an SVG path through the route points with rounded corners. Quadratic
+ * curves keep every bend smooth at any zoom, and the radius shrinks on short
+ * legs so a curve never overshoots its neighbours.
+ */
+function roundedPath(points: RoutePoint[]): string {
+  if (points.length === 0) return '';
+
+  const first = points[0];
+  if (points.length === 1) return `M ${first.x} ${first.y}`;
+
+  let path = `M ${first.x} ${first.y}`;
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const next = points[index + 1];
+
+    const inLength = Math.hypot(current.x - previous.x, current.y - previous.y);
+    const outLength = Math.hypot(next.x - current.x, next.y - current.y);
+
+    if (inLength === 0 || outLength === 0) {
+      path += ` L ${current.x} ${current.y}`;
+      continue;
+    }
+
+    const radius = Math.min(CORNER_RADIUS, inLength / 2, outLength / 2);
+    const inX = current.x - ((current.x - previous.x) / inLength) * radius;
+    const inY = current.y - ((current.y - previous.y) / inLength) * radius;
+    const outX = current.x + ((next.x - current.x) / outLength) * radius;
+    const outY = current.y + ((next.y - current.y) / outLength) * radius;
+
+    path += ` L ${inX} ${inY} Q ${current.x} ${current.y} ${outX} ${outY}`;
+  }
+
+  const last = points[points.length - 1];
+  return `${path} L ${last.x} ${last.y}`;
 }
 
 type StoreMapProps = {
@@ -130,6 +170,9 @@ export function StoreMap({
     highlightedDepartmentId !== null && departmentId !== highlightedDepartmentId;
 
   const focused = Boolean(focusPoints && focusPoints.length > 0);
+  /** No leg selected means the whole planned route is on show. */
+  const overview = Boolean(route) && activeLegIndex === null;
+  const startActive = activeLegIndex === 0 || overview;
 
   const viewBox = useMemo(() => {
     const full = `0 0 ${storeLayout.width} ${storeLayout.height}`;
@@ -238,63 +281,25 @@ export function StoreMap({
               })}
             </G>
 
-            {/* Shelving: one continuous fixture per run, split by department. */}
+            {/* Shelving: one solid fixture per run, so an aisle reads as one
+                continuous gondola instead of a row of grey blocks. */}
             {storeLayout.runs.map((run, index) => {
               const color = departmentColor(run.departmentId, themeName);
               const dimmed = isDimmed(run.departmentId);
 
               return (
-                <G key={`run-${index}`} opacity={dimmed ? 0.3 : 1}>
-                  <Rect
-                    x={run.x}
-                    y={run.y}
-                    width={run.width}
-                    height={run.height}
-                    rx={0.5}
-                    fill={color.fill}
-                    stroke={color.stroke}
-                    strokeWidth={0.25}
-                  />
-
-                  {/* Faint shelf lines so a long run reads as a gondola. */}
-                  {run.sections.map((section, sectionIndex) => (
-                    <Line
-                      key={`shelf-line-${section.aisleId}`}
-                      x1={run.x + 0.35}
-                      y1={section.y + 0.9}
-                      x2={run.x + run.width - 0.35}
-                      y2={section.y + 0.9}
-                      stroke={color.stroke}
-                      strokeOpacity={0.28}
-                      strokeWidth={DIVIDER_WIDTH}
-                    />
-                  ))}
-
-                  {/* Section dividers where the department changes. */}
-                  {run.sections.slice(1).map((section) =>
-                    run.splitAxis === 'y' ? (
-                      <Line
-                        key={`divider-${section.aisleId}`}
-                        x1={run.x}
-                        y1={section.y}
-                        x2={run.x + run.width}
-                        y2={section.y}
-                        stroke={colors.surface}
-                        strokeWidth={DIVIDER_WIDTH * 2}
-                      />
-                    ) : (
-                      <Line
-                        key={`divider-${section.aisleId}`}
-                        x1={section.x}
-                        y1={run.y}
-                        x2={section.x}
-                        y2={run.y + run.height}
-                        stroke={colors.surface}
-                        strokeWidth={DIVIDER_WIDTH * 2}
-                      />
-                    )
-                  )}
-                </G>
+                <Rect
+                  key={`run-${index}`}
+                  x={run.x}
+                  y={run.y}
+                  width={run.width}
+                  height={run.height}
+                  rx={0.5}
+                  fill={color.fill}
+                  stroke={color.stroke}
+                  strokeWidth={0.25}
+                  opacity={dimmed ? 0.3 : 1}
+                />
               );
             })}
 
@@ -312,94 +317,58 @@ export function StoreMap({
                   height={aisle.height}
                   rx={0.5}
                   fill={color.stroke}
+                  fillOpacity={0.18}
                   stroke={colors.text}
-                  strokeWidth={0.7}
+                  strokeWidth={0.9}
                 />
               );
             })}
 
-            {/* Planned walking route: context path, then the current leg. */}
+            {/* Planned walking route: context path, then the current leg.
+                Every leg is a surface casing followed by the coloured line, so
+                a later leg visibly crosses over an earlier one instead of the
+                strokes merging into a tangle. */}
             {route ? (
-              <G>
+              <G fill="none" strokeLinecap="round" strokeLinejoin="round">
                 {focused
                   ? null
                   : route.legs.map((leg, index) => {
                       if (index === activeLegIndex) return null;
 
+                      const d = roundedPath(leg.points);
+
+                      // In the whole-route overview, draw every leg in the
+                      // wayfinding colour instead of a faint trace.
                       return (
-                        <Polyline
-                          key={`route-${index}`}
-                          points={leg.points.map((point) => `${point.x},${point.y}`).join(' ')}
-                          fill="none"
-                          stroke={colors.textTertiary}
-                          strokeOpacity={0.45}
-                          strokeWidth={0.85}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
+                        <G key={`route-${index}`}>
+                          <Path
+                            d={d}
+                            stroke={colors.surface}
+                            strokeOpacity={overview ? 0.95 : 0.8}
+                            strokeWidth={overview ? 2.5 : 2}
+                          />
+                          <Path
+                            d={d}
+                            stroke={overview ? colors.accent : colors.textTertiary}
+                            strokeOpacity={overview ? 0.9 : 0.45}
+                            strokeWidth={overview ? 1.2 : 0.85}
+                          />
+                        </G>
                       );
                     })}
 
                 {route.legs.map((leg, index) => {
                   if (index !== activeLegIndex) return null;
 
+                  const d = roundedPath(leg.points);
+
                   return (
                     <G key={`route-active-${index}`}>
-                      <Polyline
-                        points={leg.points.map((point) => `${point.x},${point.y}`).join(' ')}
-                        fill="none"
-                        stroke={colors.surface}
-                        strokeOpacity={0.9}
-                        strokeWidth={1.9}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <Polyline
-                        points={leg.points.map((point) => `${point.x},${point.y}`).join(' ')}
-                        fill="none"
-                        stroke={colors.accent}
-                        strokeWidth={1.15}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                      <Path d={d} stroke={colors.surface} strokeOpacity={0.95} strokeWidth={2.7} />
+                      <Path d={d} stroke={colors.accent} strokeWidth={1.3} />
                     </G>
                   );
                 })}
-              </G>
-            ) : null}
-
-            {/* Start marker. Every planned route begins at the entrance. */}
-            {route ? (
-              <G>
-                <Circle
-                  cx={route.start.x}
-                  cy={route.start.y}
-                  r={activeLegIndex === 0 ? 3.1 : 2.4}
-                  fill={activeLegIndex === 0 ? colors.accent : colors.surface}
-                  stroke={activeLegIndex === 0 ? colors.accent : colors.textTertiary}
-                  strokeWidth={0.6}
-                />
-                <SvgText
-                  x={route.start.x}
-                  y={route.start.y + 0.9}
-                  fontSize={activeLegIndex === 0 ? 2.8 : 2.2}
-                  fontWeight="700"
-                  fill={activeLegIndex === 0 ? colors.surface : colors.textSecondary}
-                  textAnchor="middle">
-                  S
-                </SvgText>
-                {activeLegIndex === 0 ? (
-                  <SvgText
-                    x={route.start.x}
-                    y={route.start.y - 3.8}
-                    fontSize={1.9}
-                    fontWeight="700"
-                    letterSpacing={0.1}
-                    fill={colors.accent}
-                    textAnchor="middle">
-                    START
-                  </SvgText>
-                ) : null}
               </G>
             ) : null}
 
@@ -493,7 +462,7 @@ export function StoreMap({
                   />
                   <Circle
                     cx={lane.x + lane.width / 2}
-                    cy={lane.y + 6}
+                    cy={lane.y + lane.height - 2}
                     r={0.85}
                     fill={colors.primary}
                   />
@@ -582,16 +551,54 @@ export function StoreMap({
               stroke={colors.primary}
               strokeWidth={0.2}
             />
+            {/* The sign sits on the open floor to the left of the doors, so it
+                stays clear of the start marker when a route is shown. */}
             <SvgText
-              x={storeLayout.entrance.x}
-              y={storeLayout.height - 4.6}
-              fontSize={2.1}
+              x={storeLayout.entrance.x - storeLayout.entrance.width / 2 - 1.2}
+              y={storeLayout.height - 2.3}
+              fontSize={1.9}
               fontWeight="700"
-              letterSpacing={0.12}
+              letterSpacing={0.1}
               fill={colors.primary}
-              textAnchor="middle">
+              textAnchor="end">
               ENTRANCE
             </SvgText>
+
+            {/* Start marker. Every planned route begins at the entrance, and
+                this sits above the doorway graphics so it is never clipped. */}
+            {route ? (
+              <G>
+                <Circle
+                  cx={route.start.x}
+                  cy={route.start.y}
+                  r={startActive ? 3.1 : 2.4}
+                  fill={startActive ? colors.accent : colors.surface}
+                  stroke={startActive ? colors.accent : colors.textTertiary}
+                  strokeWidth={0.6}
+                />
+                <SvgText
+                  x={route.start.x}
+                  y={route.start.y + 0.9}
+                  fontSize={startActive ? 2.8 : 2.2}
+                  fontWeight="700"
+                  fill={startActive ? colors.surface : colors.textSecondary}
+                  textAnchor="middle">
+                  S
+                </SvgText>
+                {activeLegIndex === 0 ? (
+                  <SvgText
+                    x={route.start.x}
+                    y={route.start.y - 3.8}
+                    fontSize={1.8}
+                    fontWeight="700"
+                    letterSpacing={0.1}
+                    fill={colors.accent}
+                    textAnchor="middle">
+                    START
+                  </SvgText>
+                ) : null}
+              </G>
+            ) : null}
           </Svg>
         </Animated.View>
       </GestureDetector>
