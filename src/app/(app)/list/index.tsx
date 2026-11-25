@@ -15,7 +15,7 @@ import { Icon } from '@/components/ui/icon';
 import { AppText } from '@/components/ui/text';
 import { departmentDisplayName } from '@/data/catalog';
 import { getAisleNode } from '@/data/layout';
-import { planRoute } from '@/data/route';
+import { planRoute, type RouteMode } from '@/data/route';
 import { searchProducts } from '@/data/search';
 import { departmentColor } from '@/theme/department-colors';
 import { useAppTheme } from '@/theme/theme-provider';
@@ -35,7 +35,8 @@ const MAX_SUGGESTIONS = 6;
 /**
  * Shopping list entry point. Products come from the same ranked catalog search
  * as the Search tab, but here each result is added to the list instead of
- * opening the map. "Build route" compiles the list into department stops.
+ * opening the map. Smart and Standard buttons compile the list into department
+ * stops; both begin at the store entrance.
  */
 export default function ListScreen() {
   const { name: themeName, colors } = useAppTheme();
@@ -48,13 +49,14 @@ export default function ListScreen() {
     [query]
   );
 
-  const buildRoute = () => {
+  const buildRoute = (mode: RouteMode) => {
     const plan = planRoute(
       list.map((item) => ({
         name: item.name,
         departmentId: item.departmentId,
         aisleId: item.aisleId,
-      }))
+      })),
+      { mode }
     );
     if (!plan) return;
 
@@ -81,7 +83,7 @@ export default function ListScreen() {
         ]}>
         <AppText variant="title">Shopping list</AppText>
         <AppText color="textSecondary" style={styles.intro}>
-          Add what you need, then we’ll work out the shortest walking order.
+          Add what you need, then choose Smart for the shortest route or Standard to follow your list.
         </AppText>
 
         <View style={styles.actions}>
@@ -255,12 +257,28 @@ export default function ListScreen() {
             paddingBottom: insets.bottom + Spacing.md,
           },
         ]}>
-        <Button
-          label={list.length > 0 ? `Build route · ${list.length} items` : 'Build route'}
-          onPress={buildRoute}
-          disabled={list.length === 0}
-          testID="build-route"
-        />
+        <AppText variant="caption" color="textTertiary" style={styles.footerHint}>
+          {list.length > 0
+            ? `${list.length} item${list.length === 1 ? '' : 's'} · both routes start at the entrance and end at checkout`
+            : 'Both routes start at the entrance and end at checkout'}
+        </AppText>
+        <View style={styles.routeButtons}>
+          <Button
+            label="Smart route"
+            onPress={() => buildRoute('smart')}
+            disabled={list.length === 0}
+            testID="smart-route"
+            style={styles.routeButton}
+          />
+          <Button
+            label="Standard route"
+            variant="secondary"
+            onPress={() => buildRoute('standard')}
+            disabled={list.length === 0}
+            testID="standard-route"
+            style={styles.routeButton}
+          />
+        </View>
       </View>
     </View>
   );
@@ -406,5 +424,17 @@ const styles = StyleSheet.create({
   footer: {
     paddingTop: Spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.sm,
+  },
+  footerHint: {
+    textAlign: 'center',
+  },
+  routeButtons: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  routeButton: {
+    flex: 1,
+    paddingHorizontal: Spacing.sm,
   },
 });

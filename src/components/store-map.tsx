@@ -368,6 +368,41 @@ export function StoreMap({
               </G>
             ) : null}
 
+            {/* Start marker. Every planned route begins at the entrance. */}
+            {route ? (
+              <G>
+                <Circle
+                  cx={route.start.x}
+                  cy={route.start.y}
+                  r={activeLegIndex === 0 ? 3.1 : 2.4}
+                  fill={activeLegIndex === 0 ? colors.accent : colors.surface}
+                  stroke={activeLegIndex === 0 ? colors.accent : colors.textTertiary}
+                  strokeWidth={0.6}
+                />
+                <SvgText
+                  x={route.start.x}
+                  y={route.start.y + 0.9}
+                  fontSize={activeLegIndex === 0 ? 2.8 : 2.2}
+                  fontWeight="700"
+                  fill={activeLegIndex === 0 ? colors.surface : colors.textSecondary}
+                  textAnchor="middle">
+                  S
+                </SvgText>
+                {activeLegIndex === 0 ? (
+                  <SvgText
+                    x={route.start.x}
+                    y={route.start.y - 3.8}
+                    fontSize={1.9}
+                    fontWeight="700"
+                    letterSpacing={0.1}
+                    fill={colors.accent}
+                    textAnchor="middle">
+                    START
+                  </SvgText>
+                ) : null}
+              </G>
+            ) : null}
+
             {/* Tap targets, one per shelf section. */}
             {aisleNodes.map((aisle) => (
               <Rect

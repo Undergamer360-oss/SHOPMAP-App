@@ -1,6 +1,12 @@
 import { router } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeInDown,
+  ReduceMotion,
+  useAnimatedStyle,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ProductThumbnail } from '@/components/product-thumbnail';
 import { StoreMap } from '@/components/store-map';
@@ -25,16 +31,35 @@ function shelfFocusPoints(shelf: RouteStop['shelf']): RoutePoint[] {
   ];
 }
 
+const HERO_ENTERING = FadeInDown.duration(240).reduceMotion(ReduceMotion.System);
+const DIRECTIONS_ENTERING = FadeInDown.duration(200)
+  .delay(40)
+  .reduceMotion(ReduceMotion.System);
+
 /**
  * Turn-by-turn guide. Each press advances exactly one stop, then checkout.
- * The first direction after a pickup is based on the shopper facing the shelf,
- * and the map is fitted to the leg they are walking rather than the whole store.
+ * The trip begins with an explicit entrance instruction, the first direction
+ * after a pickup is based on the shopper facing the shelf, and the map is fitted
+ * to the leg they are walking. Step changes use reduced-motion-aware transitions.
  */
 export default function NavigateScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { plan, step, skipped, done } = navigation;
+  const total = stepCount(navigation);
+  const progressRatio =
+    plan && total > 0 ? Math.min(1, Math.max(0, (step + 1) / total)) : 0;
+  const progressStyle = useAnimatedStyle(() => ({
+    transform: [
+      {
+        scaleX: withTiming(progressRatio, {
+          duration: 260,
+          reduceMotion: ReduceMotion.System,
+        }),
+      },
+    ],
+  }));
 
   if (!plan) {
     return (
@@ -74,7 +99,6 @@ export default function NavigateScreen() {
     );
   }
 
-  const total = stepCount(navigation);
   const currentStop = step < plan.stops.length ? plan.stops[step] : null;
   const isCheckout = currentStop === null;
   const currentLeg = plan.legs[step];
@@ -84,7 +108,7 @@ export default function NavigateScreen() {
     isCheckout ? 'checkout' : currentStop.departmentName,
     originShelf
   );
-  const progress = ((step + 1) / total) * 100;
+  const progress = progressRatio * 100;
   const aisleLabel = currentStop
     ? currentStop.aisleNumber ?? currentStop.aisleId
     : null;
@@ -109,12 +133,32 @@ export default function NavigateScreen() {
         </View>
 
         <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
-          <View
-            style={[styles.progressFill, { backgroundColor: colors.accent, width: `${progress}%` }]}
+          <Animated.View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: colors.accent,
+                transformOrigin: 'left center',
+              },
+              progressStyle,
+            ]}
           />
         </View>
 
-        <View
+        <View style={styles.tripMeta}>
+          <AppText variant="caption" color="textTertiary">
+            {plan.mode === 'smart' ? 'SMART ROUTE' : 'STANDARD ROUTE'}
+          </AppText>
+          {step === 0 ? (
+            <AppText variant="caption" style={{ color: colors.accent }}>
+              FROM ENTRANCE
+            </AppText>
+          ) : null}
+        </View>
+
+        <Animated.View
+          key={`hero-${plan.mode}-${step}`}
+          entering={HERO_ENTERING}
           style={[
             styles.hero,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -180,9 +224,9 @@ export default function NavigateScreen() {
               {Math.round(progress)}% COMPLETE
             </AppText>
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.directionsCard}>
+        <Animated.View key={`directions-${step}`} entering={DIRECTIONS_ENTERING} style={styles.directionsCard}>
           <View style={styles.sectionHeader}>
             <AppText variant="label">DIRECTIONS</AppText>
             <AppText variant="caption" color="textTertiary">
@@ -228,7 +272,7 @@ export default function NavigateScreen() {
               </AppText>
             </View>
           ))}
-        </View>
+        </Animated.View>
 
         <View
           style={[
@@ -312,6 +356,12 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
+    width: '100%',
+  },
+  tripMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   hero: {
     padding: Spacing.lg,

@@ -112,6 +112,17 @@ export function directionsForLeg(
 
   const instructions: DirectionInstruction[] = [];
 
+  // The first leg always begins outside the store, so say so explicitly. This
+  // keeps custom lists just as entrance-first as the ten-item demo.
+  if (leg.fromEntrance) {
+    instructions.push({
+      id: 'entrance',
+      action: 'Start at the entrance',
+      detail: 'Come in through the front doors',
+      metres: 0,
+    });
+  }
+
   if (originShelf && segments.length > 0) {
     instructions.push({
       id: 'face',

@@ -11,11 +11,13 @@ import { METRES_PER_MAP_UNIT, storeLayout } from '@/data/layout';
  * points.
  *
  * Stops are departments, not individual products: a shopper walks to the
- * department once and picks up everything on the list that lives there. The
- * visit order is chosen by an exact solver for small lists and 2-opt for
- * larger ones. In both cases the shopper's original list order is used as the
- * starting candidate and a candidate is only accepted if it is strictly
- * shorter, so the planned route can never be longer than list order.
+ * department once and picks up everything on the list that lives there. Every
+ * plan starts at the store entrance and ends at checkout.
+ *
+ * `standard` mode keeps the shopper's list order. `smart` mode reorders those
+ * stops with an exact solver for small lists and 2-opt for larger ones. The
+ * smart solver starts from the list-order candidate and only accepts strictly
+ * shorter candidates, so the smart route can never be longer than standard.
  */
 
 /** One map unit is half a metre (see layout.ts). */
@@ -26,6 +28,11 @@ export const SECONDS_PER_STOP = 20;
 const EXACT_LIMIT = 12;
 
 export type RoutePoint = { x: number; y: number };
+
+/** How the department stops are ordered. */
+export type RouteMode = 'standard' | 'smart';
+
+export type PlanRouteOptions = { mode?: RouteMode };
 
 export type RouteItem = {
   name: string;
@@ -59,9 +66,13 @@ export type RouteLeg = {
   seconds: number;
   /** Which stop this leg walks to; null for the final leg to checkout. */
   stopNumber: number | null;
+  /** True for the first leg, which always begins at the store entrance. */
+  fromEntrance?: boolean;
 };
 
 export type RoutePlan = {
+  /** Planning mode used to order the stops. */
+  mode: RouteMode;
   stops: RouteStop[];
   legs: RouteLeg[];
   start: RoutePoint;
@@ -433,20 +444,35 @@ function twoOptOrder(
 }
 
 /**
- * Builds an efficient walking route for a shopping list.
+ * Builds a walking route for a shopping list.
  *
- * Items sharing a department are folded into one stop. Returns null for an
- * empty list.
+ * Standard mode keeps every list entry in order, so repeated departments are
+ * visited again. Smart mode folds items sharing a department into one stop and
+ * reorders those stops for the shortest walk. Both modes always enter through
+ * the entrance and finish at checkout. Returns null for an empty list.
  */
-export function planRoute(items: RouteItem[]): RoutePlan | null {
+export function planRoute(
+  items: RouteItem[],
+  options: PlanRouteOptions = {}
+): RoutePlan | null {
+  const mode = options.mode ?? 'smart';
   const current = getGraph();
   const validItems = items.filter((item) => current.departmentNode.has(item.departmentId));
   if (validItems.length === 0) return null;
 
-  // Preserve the order the shopper wrote the list in: it is both the baseline
-  // for the savings figure and the seed the optimiser starts from.
-  type Group = { items: string[]; aisleIds: number[] };
-  const grouped = new Map<number, Group>();
+  type StopGroup = { departmentId: number; items: string[]; aisleIds: number[] };
+
+  // Standard is one stop per list entry, including repeated departments. It is
+  // both the route shown in standard mode and the smart savings baseline.
+  const standardGroups: StopGroup[] = validItems.map((item) => ({
+    departmentId: item.departmentId,
+    items: [item.name],
+    aisleIds: item.aisleId != null ? [item.aisleId] : [],
+  }));
+
+  // Smart folds each department into one stop, keeping first-appearance order
+  // as the optimiser's seed and only accepting strictly shorter candidates.
+  const grouped = new Map<number, StopGroup>();
   for (const item of validItems) {
     const existing = grouped.get(item.departmentId);
     if (existing) {
@@ -454,6 +480,7 @@ export function planRoute(items: RouteItem[]): RoutePlan | null {
       if (item.aisleId != null) existing.aisleIds.push(item.aisleId);
     } else {
       grouped.set(item.departmentId, {
+        departmentId: item.departmentId,
         items: [item.name],
         aisleIds: item.aisleId != null ? [item.aisleId] : [],
       });
@@ -468,13 +495,20 @@ export function planRoute(items: RouteItem[]): RoutePlan | null {
   };
 
   const order =
-    seed.length <= EXACT_LIMIT
-      ? exactOrder(seed, nodeFor)
-      : twoOptOrder(seed, nodeFor);
+    mode === 'standard'
+      ? standardGroups.map((group) => group.departmentId)
+      : seed.length <= EXACT_LIMIT
+        ? exactOrder(seed, nodeFor)
+        : twoOptOrder(seed, nodeFor);
+
+  const groupsForOrder =
+    mode === 'standard'
+      ? standardGroups
+      : order.map((departmentId) => grouped.get(departmentId)!);
 
   const listSequence = [
     current.entranceNode,
-    ...validItems.map((item) => nodeFor(item.departmentId)),
+    ...standardGroups.map((group) => nodeFor(group.departmentId)),
     current.checkoutNode,
   ];
   const listUnits = sequenceDistance(listSequence);
@@ -484,7 +518,7 @@ export function planRoute(items: RouteItem[]): RoutePlan | null {
       (entry) => entry.id === departmentId
     );
     const node = nodeFor(departmentId);
-    const group = grouped.get(departmentId) ?? { items: [], aisleIds: [] };
+    const group = groupsForOrder[index];
     const departmentShelf = current.departmentShelf.get(departmentId);
     const itemShelves = group.aisleIds
       .map((aisleId) => storeLayout.aisles.find((aisle) => aisle.id === aisleId))
@@ -533,15 +567,17 @@ export function planRoute(items: RouteItem[]): RoutePlan | null {
       distanceMetres: metres,
       seconds: metres / WALKING_METRES_PER_SECOND,
       stopNumber: index === sequence.length - 2 ? null : index + 1,
+      fromEntrance: index === 0,
     });
   }
 
   const totalMetres = legs.reduce((total, leg) => total + leg.distanceMetres, 0);
   const travelSeconds = legs.reduce((total, leg) => total + leg.seconds, 0);
   const listMetres = listUnits * METRES_PER_UNIT;
-  const savedMetres = Math.max(0, listMetres - totalMetres);
+  const savedMetres = mode === 'smart' ? Math.max(0, listMetres - totalMetres) : 0;
 
   return {
+    mode,
     stops,
     legs,
     start: current.points[current.entranceNode],

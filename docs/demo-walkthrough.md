@@ -15,21 +15,25 @@ Home opens straight onto the **SHOPMAP DEMO** wordmark with a five-item thumbnai
 
 1. Go to **Home → Start a shopping list**.
 2. Tap **Load 10 items**. Each tap builds a fresh zig-zag list; consecutive demos never reuse the same order.
-3. Tap **Build route**. The route review shows the optimised distance and the saving over list order.
-4. Tap **Start navigation**.
-5. For each item card, point out:
+3. Tap **Smart route** to see the engine’s shortest walk, or **Standard route** to follow the list literally from first entry to last. Both start with an **Entrance** row and the first direction **Start at the entrance**.
+4. The route review labels the mode. Smart shows the saving over Standard; Standard explains that nothing was reordered.
+5. Tap **Start navigation**. The first card is marked **FROM ENTRANCE**, and the map has a blue **S** start marker on the entrance leg.
+6. For each item card, point out:
    - the item name with **in aisle** and **located in** underneath,
    - the person-relative first turn (**Turn left from the shelf** or **Turn right from the shelf**, assuming the shopper is facing the shelf), then **Go straight — 8 m**, **Turn right — 4 m**, **Arrive at Produce**,
-   - the highlighted leg on a map fitted to the current start and stop.
-6. Press **Got it, next** ten times, then **Finish trip** for checkout: 11 advances total.
-7. On a second run, press **Skip** once to show that it advances and records the skipped stop.
+   - the highlighted leg on a map fitted to the current start and stop,
+   - the subtle fade/slide transition as the next step arrives (respects the system Reduce Motion setting).
+7. Press **Got it, next** ten times, then **Finish trip** for checkout: 11 advances total.
+8. On a second run, press **Skip** once to show that it advances and records the skipped stop.
 
 ## Store model
 
 - Store: **41.5 × 58 m** (83 × 116 map units at 0.5 m per unit).
 - Shelves: **1 m** deep; walking aisles **1.5 m** wide; centre-to-centre aisle pitch **2.5 m**.
-- Walking speed: 1.2 m/s, plus 20 s at each department stop.
+- Walking speed: 1.2 m/s, plus 20 s at each stop.
 - Routing grid blocks every shelf, so no leg crosses a gondola.
+- Every plan starts at the entrance marker and ends at checkout.
+- **Standard** keeps each list entry, including repeated departments. **Smart** folds repeated departments into one stop, then uses exact Held–Karp (≤12 stops) or 2-opt (more stops), accepting only strictly shorter orders. Smart is never longer than Standard.
 
 ## Verification
 
@@ -41,9 +45,11 @@ npx --yes tsx scripts/verify-success-criteria.ts
 
 It checks:
 
-- 17 pre-checked demo orders, each with 10 departments visited exactly once, at least 15% saving, and a route never longer than list order;
+- 17 pre-checked demo orders in both modes: Smart visits 10 departments once with at least 15% saving, while Standard follows the entries exactly and reports 0 saving;
+- a repeated-department custom list: Standard keeps all four entries, Smart folds them into three stops, and Smart is never longer;
+- every plan starts at the entrance and ends at checkout, with the first direction **Start at the entrance**;
 - all sample legs stay out of shelves;
-- directions exist for every leg, their metre distances match the leg distance, the first turn after a pickup matches the shopper facing the shelf, and no direction uses compass headings;
+- direction distances match each leg, the first turn after a pickup matches the shopper facing the shelf, and no direction uses compass headings;
 - 11 navigation advances, Skip behaviour, and a changing instruction per step;
 - all ten demo thumbnails and at least 95% catalog thumbnail coverage.
 
@@ -60,6 +66,6 @@ Ask three first-time users to:
 
 1. Open the app and skip setup.
 2. Add any six items to the list.
-3. Build the route and complete the first three navigation steps without help.
+3. Build a Smart route and complete the first three navigation steps without help, then repeat with Standard.
 
 Record completion time and any confusion. Target: all three finish in under three minutes. The demo list has a **Load 10 items** shortcut, but this test should use manual adds so the search flow is covered.
