@@ -1,28 +1,14 @@
 import type { ThemeName } from '@/theme/tokens';
 
 /**
- * Departments get a colour derived from their id, so no palette needs to be
- * maintained by hand and every department stays visually distinct.
+ * Uber-like monochrome department colours. The palette is deliberately black,
+ * white and grey; department ids only shift the grey slightly so shelves stay
+ * distinguishable without introducing brand colours into the map.
  */
-const GOLDEN_ANGLE = 137.508;
-
-function hueFor(departmentId: number) {
-  return (departmentId * GOLDEN_ANGLE + 168) % 360;
-}
-
-function hslToHex(hue: number, saturation: number, lightness: number) {
-  const s = saturation / 100;
-  const l = lightness / 100;
-  const k = (n: number) => (n + hue / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const channel = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-
-  const toHex = (value: number) =>
-    Math.round(255 * value)
-      .toString(16)
-      .padStart(2, '0');
-
-  return `#${toHex(channel(0))}${toHex(channel(8))}${toHex(channel(4))}`;
+function grey(value: number) {
+  const channel = Math.max(0, Math.min(255, Math.round(value)));
+  const hex = channel.toString(16).padStart(2, '0');
+  return `#${hex}${hex}${hex}`;
 }
 
 export type DepartmentColor = {
@@ -35,19 +21,19 @@ export type DepartmentColor = {
 };
 
 export function departmentColor(departmentId: number, theme: ThemeName): DepartmentColor {
-  const hue = hueFor(departmentId);
+  const step = departmentId % 5;
 
   if (theme === 'dark') {
     return {
-      fill: hslToHex(hue, 38, 30),
-      stroke: hslToHex(hue, 62, 66),
-      wash: hslToHex(hue, 40, 18),
+      fill: grey(32 + step * 6),
+      stroke: grey(238 - step * 10),
+      wash: grey(16 + step * 3),
     };
   }
 
   return {
-    fill: hslToHex(hue, 46, 74),
-    stroke: hslToHex(hue, 52, 38),
-    wash: hslToHex(hue, 52, 93),
+    fill: grey(232 - step * 9),
+    stroke: grey(34 + step * 9),
+    wash: grey(250 - step * 3),
   };
 }

@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 
 import { useAppTheme } from '@/theme/theme-provider';
 
-export function TabStack({ title }: { title: string }) {
+export function TabStack({ title, hideHeader = false }: { title: string; hideHeader?: boolean }) {
   const { colors } = useAppTheme();
 
   return (
@@ -16,7 +16,7 @@ export function TabStack({ title }: { title: string }) {
         headerTintColor: colors.primary,
         contentStyle: { backgroundColor: colors.background },
       }}>
-      <Stack.Screen name="index" options={{ title }} />
+      <Stack.Screen name="index" options={{ title, headerShown: !hideHeader }} />
     </Stack>
   );
 }

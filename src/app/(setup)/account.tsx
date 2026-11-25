@@ -7,6 +7,7 @@ import { SetupScreen } from '@/components/ui/setup-screen';
 import { AppText } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { useSetupDraft } from '@/state/setup-draft';
+import { skipSetup } from '@/state/setup-store';
 import { Spacing } from '@/theme/tokens';
 
 type Errors = {
@@ -48,14 +49,24 @@ export default function AccountScreen() {
     router.push('/address');
   }
 
+  async function handleSkip() {
+    await skipSetup({ language: draft.language, theme: draft.theme });
+    router.replace('/home');
+  }
+
   return (
     <SetupScreen
       step={3}
       total={4}
-      title="Create your account"
-      subtitle="This account lives on this device only. Your password is stored in the device keychain."
+      title="Create your account (optional)"
+      subtitle="This account lives on this device only. Skip it to continue as a guest — you can add details later."
       onBack={() => router.back()}
-      footer={<Button label="Continue" onPress={handleContinue} />}>
+      footer={
+        <View style={{ gap: Spacing.sm }}>
+          <Button label="Continue" onPress={handleContinue} />
+          <Button label="Skip for now" variant="ghost" onPress={handleSkip} />
+        </View>
+      }>
       <View style={{ gap: Spacing.lg }}>
         <TextField
           label="Username"

@@ -12,6 +12,9 @@ export type AppColors = {
   primary: string;
   onPrimary: string;
   primarySoft: string;
+  /** Sparse wayfinding accent; the app itself stays black, white and grey. */
+  accent: string;
+  accentSoft: string;
   success: string;
   danger: string;
   dangerSoft: string;
@@ -19,34 +22,38 @@ export type AppColors = {
 
 export const palettes: Record<ThemeName, AppColors> = {
   light: {
-    background: '#F5F7F8',
+    background: '#FFFFFF',
     surface: '#FFFFFF',
-    surfaceMuted: '#EDF0F2',
-    border: '#E1E6E9',
-    text: '#0F1417',
-    textSecondary: '#59636B',
-    textTertiary: '#8A949C',
-    primary: '#0E7C66',
+    surfaceMuted: '#F2F2F2',
+    border: '#E5E5E5',
+    text: '#000000',
+    textSecondary: '#5A5A5A',
+    textTertiary: '#8A8A8A',
+    primary: '#000000',
     onPrimary: '#FFFFFF',
-    primarySoft: '#E2F2ED',
-    success: '#1A7F37',
-    danger: '#C0392B',
-    dangerSoft: '#FBECEA',
+    primarySoft: '#F2F2F2',
+    accent: '#0A84FF',
+    accentSoft: '#E8F2FF',
+    success: '#111111',
+    danger: '#B00020',
+    dangerSoft: '#FCE8E6',
   },
   dark: {
-    background: '#0A0E10',
-    surface: '#14191C',
-    surfaceMuted: '#1B2226',
-    border: '#293135',
-    text: '#F1F5F6',
-    textSecondary: '#A2ADB4',
-    textTertiary: '#748087',
-    primary: '#3ED6B4',
-    onPrimary: '#03231C',
-    primarySoft: '#113129',
-    success: '#4ADE80',
-    danger: '#FF7A6E',
-    dangerSoft: '#2B1715',
+    background: '#000000',
+    surface: '#111111',
+    surfaceMuted: '#1C1C1C',
+    border: '#2E2E2E',
+    text: '#FFFFFF',
+    textSecondary: '#B3B3B3',
+    textTertiary: '#808080',
+    primary: '#FFFFFF',
+    onPrimary: '#000000',
+    primarySoft: '#1C1C1C',
+    accent: '#5E9EFF',
+    accentSoft: '#10233D',
+    success: '#FFFFFF',
+    danger: '#FF6B6B',
+    dangerSoft: '#2A1111',
   },
 };
 

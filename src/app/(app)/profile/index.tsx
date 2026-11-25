@@ -28,15 +28,14 @@ export default function ProfileScreen() {
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  if (!profile) {
-    return null;
-  }
-
-  const initial = profile.username.slice(0, 1).toUpperCase();
-  const memberSince = new Date(profile.createdAt).toLocaleDateString(undefined, {
-    month: 'long',
-    year: 'numeric',
-  });
+  const isGuest = !profile;
+  const initial = profile?.username.slice(0, 1).toUpperCase() ?? 'G';
+  const memberSince = profile
+    ? new Date(profile.createdAt).toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
 
   async function handleReset() {
     setResetting(true);
@@ -61,9 +60,9 @@ export default function ProfileScreen() {
           </AppText>
         </View>
         <View style={styles.identityCopy}>
-          <AppText variant="headline">{profile.username}</AppText>
+          <AppText variant="headline">{profile?.username ?? 'Guest shopper'}</AppText>
           <AppText variant="caption" color="textSecondary">
-            Member since {memberSince}
+            {memberSince ? `Member since ${memberSince}` : 'You skipped setup. Add details any time.'}
           </AppText>
         </View>
       </Card>
@@ -78,8 +77,15 @@ export default function ProfileScreen() {
             Address
           </AppText>
           <AppText variant="body" selectable>
-            {formatAddress(profile.address)}
+            {profile ? formatAddress(profile.address) : 'Not provided'}
           </AppText>
+          {isGuest ? (
+            <Button
+              label="Add details"
+              variant="secondary"
+              onPress={() => router.push('/account')}
+            />
+          ) : null}
         </View>
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />

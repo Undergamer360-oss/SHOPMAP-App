@@ -6,6 +6,7 @@ import { BrandMark, BrandWordmark } from '@/components/brand-mark';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { AppText } from '@/components/ui/text';
+import { skipSetup } from '@/state/setup-store';
 import { useAppTheme } from '@/theme/theme-provider';
 import { Radius, Spacing } from '@/theme/tokens';
 
@@ -34,6 +35,11 @@ export default function WelcomeScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  async function handleSkip() {
+    await skipSetup({ language: 'en', theme: 'system' });
+    router.replace('/home');
+  }
 
   return (
     <ScrollView
@@ -72,8 +78,9 @@ export default function WelcomeScreen() {
 
       <View style={styles.footer}>
         <Button label="Get started" onPress={() => router.push('/language')} />
+        <Button label="Skip setup" variant="ghost" onPress={handleSkip} />
         <AppText variant="caption" color="textTertiary" style={styles.centered}>
-          Takes about a minute. You can change everything later.
+          Setup takes about a minute, but you can skip it and add details later.
         </AppText>
       </View>
     </ScrollView>

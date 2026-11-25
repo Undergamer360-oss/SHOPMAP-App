@@ -5,10 +5,10 @@ import { aislesByDepartment, departments, type Aisle } from '@/data/catalog';
  * supermarket rather than a generic grid.
  *
  * The catalog is a taxonomy, not geometry, so the map is *generated*: the same
- * input always produces the same floor plan. Coordinates are in map units
- * (roughly half a metre, so the finished store reads about 45 x 60 m) and stay
- * fractional, which keeps the SVG crisp and lets the same numbers drive route
- * planning later.
+ * input always produces the same floor plan. One map unit is 0.5 m, so the
+ * finished store is 41.5 x 58 m. Shelves are 1 m deep, shopping aisles are
+ * 1.5 m wide, and the centre-to-centre aisle pitch is 2.5 m — realistic sizes
+ * for a small neighbourhood supermarket.
  *
  * Shape of the store, back to front:
  * - service counters along the back and side walls for the departments people
@@ -43,6 +43,9 @@ const DEPARTMENT_ORDER = [
   'other',
   'missing',
 ];
+
+/** One map unit represents half a metre of real walking distance. */
+export const METRES_PER_MAP_UNIT = 0.5;
 
 export const GONDOLA_WIDTH = 2;
 export const CORRIDOR_WIDTH = 3;
@@ -573,6 +576,13 @@ function buildLayout(): StoreLayout {
 }
 
 export const storeLayout: StoreLayout = buildLayout();
+
+/** Real-world dimensions used by the demo and the turn-by-turn directions. */
+export const STORE_WIDTH_METRES = storeLayout.width * METRES_PER_MAP_UNIT;
+export const STORE_HEIGHT_METRES = storeLayout.height * METRES_PER_MAP_UNIT;
+export const SHELF_DEPTH_METRES = GONDOLA_WIDTH * METRES_PER_MAP_UNIT;
+export const WALKING_AISLE_METRES = CORRIDOR_WIDTH * METRES_PER_MAP_UNIT;
+export const AISLE_PITCH_METRES = AISLE_PITCH * METRES_PER_MAP_UNIT;
 
 export const layoutAislesById = new Map<number, AisleNode>(
   storeLayout.aisles.map((aisle) => [aisle.id, aisle])

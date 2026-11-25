@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/immutability -- Reanimated shared values are
    intentionally mutated from worklets; the React Compiler lint rule cannot
    model that and flags every `.value =` assignment. */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -9,10 +9,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, G, Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
 import type { Aisle } from '@/data/catalog';
 import { storeLayout } from '@/data/layout';
+import type { RoutePlan, RoutePoint } from '@/data/route';
 import { departmentColor } from '@/theme/department-colors';
 import { useAppTheme } from '@/theme/theme-provider';
 
@@ -44,6 +45,14 @@ type StoreMapProps = {
   onSelectAisle: (aisle: Aisle) => void;
   /** Bump this to animate the map back to the fitted view. */
   resetKey: number;
+  /** When present, draw the planned walking path over the floor plan. */
+  route?: RoutePlan | null;
+  /** Leg currently being walked (0-based). Drawn on top and in full colour. */
+  activeLegIndex?: number | null;
+  /** Stop the shopper is heading to (1-based). Its marker is emphasised. */
+  activeStopNumber?: number | null;
+  /** When present, fit the view to this area instead of the whole store. */
+  focusPoints?: RoutePoint[] | null;
 };
 
 export function StoreMap({
@@ -51,8 +60,13 @@ export function StoreMap({
   selectedAisleId,
   onSelectAisle,
   resetKey,
+  route,
+  activeLegIndex = null,
+  activeStopNumber = null,
+  focusPoints = null,
 }: StoreMapProps) {
   const { name: themeName, colors } = useAppTheme();
+  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
 
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
@@ -115,19 +129,72 @@ export function StoreMap({
   const isDimmed = (departmentId: number) =>
     highlightedDepartmentId !== null && departmentId !== highlightedDepartmentId;
 
+  const focused = Boolean(focusPoints && focusPoints.length > 0);
+
+  const viewBox = useMemo(() => {
+    const full = `0 0 ${storeLayout.width} ${storeLayout.height}`;
+    if (!focused || !focusPoints || frameSize.width <= 0 || frameSize.height <= 0) return full;
+
+    const xs = focusPoints.map((point) => point.x);
+    const ys = focusPoints.map((point) => point.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const spanX = Math.max(maxX - minX, 6);
+    const spanY = Math.max(maxY - minY, 6);
+
+    let left = minX - Math.max(4, spanX * 0.35);
+    let top = minY - Math.max(4, spanY * 0.35);
+    let width = spanX + Math.max(4, spanX * 0.35) * 2;
+    let height = spanY + Math.max(4, spanY * 0.35) * 2;
+
+    // Match the viewport ratio so the leg is not squashed or padded unevenly.
+    const aspect = frameSize.width / frameSize.height;
+    if (width / height < aspect) {
+      const centreX = left + width / 2;
+      width = height * aspect;
+      left = centreX - width / 2;
+    } else {
+      const centreY = top + height / 2;
+      height = width / aspect;
+      top = centreY - height / 2;
+    }
+
+    if (width >= storeLayout.width) {
+      left = 0;
+      width = storeLayout.width;
+    } else {
+      left = Math.min(Math.max(left, 0), storeLayout.width - width);
+    }
+
+    if (height >= storeLayout.height) {
+      top = 0;
+      height = storeLayout.height;
+    } else {
+      top = Math.min(Math.max(top, 0), storeLayout.height - height);
+    }
+
+    return `${left.toFixed(2)} ${top.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)}`;
+  }, [focused, focusPoints, frameSize.width, frameSize.height]);
+
   return (
     <View
       style={[styles.frame, { backgroundColor: colors.surfaceMuted }]}
       onLayout={(event) => {
-        frameWidth.value = event.nativeEvent.layout.width;
-        frameHeight.value = event.nativeEvent.layout.height;
+        const { width, height } = event.nativeEvent.layout;
+        frameWidth.value = width;
+        frameHeight.value = height;
+        setFrameSize((previous) =>
+          previous.width === width && previous.height === height ? previous : { width, height }
+        );
       }}>
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.canvas, animatedStyle]}>
           <Svg
             width="100%"
             height="100%"
-            viewBox={`0 0 ${storeLayout.width} ${storeLayout.height}`}>
+            viewBox={viewBox}>
             {/* Floor slab. */}
             <Rect
               x={0}
@@ -251,6 +318,56 @@ export function StoreMap({
               );
             })}
 
+            {/* Planned walking route: context path, then the current leg. */}
+            {route ? (
+              <G>
+                {focused
+                  ? null
+                  : route.legs.map((leg, index) => {
+                      if (index === activeLegIndex) return null;
+
+                      return (
+                        <Polyline
+                          key={`route-${index}`}
+                          points={leg.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                          fill="none"
+                          stroke={colors.textTertiary}
+                          strokeOpacity={0.45}
+                          strokeWidth={0.85}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      );
+                    })}
+
+                {route.legs.map((leg, index) => {
+                  if (index !== activeLegIndex) return null;
+
+                  return (
+                    <G key={`route-active-${index}`}>
+                      <Polyline
+                        points={leg.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                        fill="none"
+                        stroke={colors.surface}
+                        strokeOpacity={0.9}
+                        strokeWidth={1.9}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <Polyline
+                        points={leg.points.map((point) => `${point.x},${point.y}`).join(' ')}
+                        fill="none"
+                        stroke={colors.accent}
+                        strokeWidth={1.15}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </G>
+                  );
+                })}
+              </G>
+            ) : null}
+
             {/* Tap targets, one per shelf section. */}
             {aisleNodes.map((aisle) => (
               <Rect
@@ -362,6 +479,35 @@ export function StoreMap({
                 </SvgText>
               ))}
             </G>
+
+            {/* Numbered stops on the planned route. */}
+            {route
+              ? route.stops.map((stop) => {
+                  const active = stop.number === activeStopNumber;
+
+                  return (
+                    <G key={`stop-${stop.number}`}>
+                      <Circle
+                        cx={stop.point.x}
+                        cy={stop.point.y}
+                        r={active ? 2.9 : 2.3}
+                        fill={active ? colors.accent : colors.surface}
+                        stroke={active ? colors.accent : colors.textTertiary}
+                        strokeWidth={active ? 0.7 : 0.45}
+                      />
+                      <SvgText
+                        x={stop.point.x}
+                        y={stop.point.y + 0.85}
+                        fontSize={active ? 2.8 : 2.3}
+                        fontWeight="700"
+                        fill={active ? colors.surface : colors.textSecondary}
+                        textAnchor="middle">
+                        {stop.number}
+                      </SvgText>
+                    </G>
+                  );
+                })
+              : null}
 
             {/* Store walls, with a gap and doors at the entrance. */}
             <Rect

@@ -109,6 +109,19 @@ export async function completeSetup(input: {
   });
 }
 
+export async function skipSetup(input: { language: Language; theme: ThemePreference }) {
+  try {
+    await clearPassword();
+  } catch (error) {
+    console.warn('[setup] could not clear stored password', error);
+  }
+  setState({
+    setupComplete: true,
+    settings: { language: input.language, theme: input.theme },
+    profile: null,
+  });
+}
+
 export async function resetSetup() {
   try {
     await clearPassword();

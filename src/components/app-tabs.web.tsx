@@ -9,6 +9,7 @@ import { Spacing } from '@/theme/tokens';
 
 const items = [
   { href: '/home', label: 'Home', sf: 'house.fill', md: 'home' },
+  { href: '/list', label: 'List', sf: 'list.bullet', md: 'list' },
   { href: '/map', label: 'Map', sf: 'map.fill', md: 'map' },
   { href: '/search', label: 'Search', sf: 'magnifyingglass', md: 'search' },
   { href: '/saved', label: 'Saved', sf: 'bookmark.fill', md: 'bookmark' },
@@ -34,7 +35,7 @@ export default function AppTabs() {
           },
         ]}>
         {items.map((item) => {
-          const active = pathname === item.href;
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const color = active ? colors.primary : colors.textTertiary;
 
           return (

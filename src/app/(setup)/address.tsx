@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { SetupScreen } from '@/components/ui/setup-screen';
 import { AppText } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
 import { useSetupDraft } from '@/state/setup-draft';
-import { completeSetup, type Address } from '@/state/setup-store';
+import { completeSetup, skipSetup, type Address } from '@/state/setup-store';
 import { Spacing } from '@/theme/tokens';
 
 type AddressErrors = Partial<Record<keyof Address, string>>;
@@ -18,6 +18,7 @@ export default function AddressScreen() {
   const { address } = draft;
 
   const [errors, setErrors] = useState<AddressErrors>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   function clearError(field: keyof Address) {
@@ -51,6 +52,7 @@ export default function AddressScreen() {
       return;
     }
 
+    setSaveError(null);
     setSaving(true);
     try {
       await completeSetup({
@@ -68,20 +70,37 @@ export default function AddressScreen() {
       });
       router.replace('/home');
     } catch {
-      Alert.alert('Could not finish setup', 'Your details could not be saved. Please try again.');
+      setSaveError('Your details could not be saved. Please try again.');
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSkip() {
+    setSaveError(null);
+    await skipSetup({ language: draft.language, theme: draft.theme });
+    router.replace('/home');
   }
 
   return (
     <SetupScreen
       step={4}
       total={4}
-      title="Where should we deliver?"
-      subtitle="We save this as your personal information so checkout is quicker next time."
+      title="Where should we deliver? (optional)"
+      subtitle="Add an address for quicker checkout, or skip and continue as a guest."
       onBack={() => router.back()}
-      footer={<Button label="Finish setup" onPress={handleFinish} loading={saving} />}>
+      footer={
+        <View style={{ gap: Spacing.sm }}>
+          <Button label="Finish setup" onPress={handleFinish} loading={saving} />
+          <Button label="Skip for now" variant="ghost" onPress={handleSkip} disabled={saving} />
+        </View>
+      }>
+      {saveError ? (
+        <AppText variant="caption" color="danger">
+          {saveError}
+        </AppText>
+      ) : null}
+
       <View style={{ gap: Spacing.lg }}>
         <TextField
           label="Street address"

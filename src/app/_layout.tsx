@@ -22,11 +22,11 @@ function RootNavigator() {
   }, []);
 
   useEffect(() => {
-    const inOnboarding = root === 'welcome' || root === '(setup)';
+    const inSetup = root === '(setup)';
 
-    if (!setupComplete && !inOnboarding) {
+    if (!setupComplete && root !== 'welcome' && !inSetup) {
       router.replace('/welcome');
-    } else if (setupComplete && inOnboarding) {
+    } else if (setupComplete && root === 'welcome') {
       router.replace('/home');
     }
   }, [setupComplete, root, router]);

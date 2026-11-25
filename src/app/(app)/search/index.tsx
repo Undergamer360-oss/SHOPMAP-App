@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
+import { ProductThumbnail } from '@/components/product-thumbnail';
 import { Icon } from '@/components/ui/icon';
 import { AppText } from '@/components/ui/text';
 import { departmentDisplayName } from '@/data/catalog';
@@ -162,13 +163,20 @@ export default function SearchScreen() {
 
                 <View style={styles.matches}>
                   {item.matches.slice(0, 4).map((match) => (
-                    <AppText
-                      key={match.product.name}
-                      variant="caption"
-                      color="textSecondary"
-                      numberOfLines={1}>
-                      {match.product.name}
-                    </AppText>
+                    <View key={match.product.name} style={styles.matchRow}>
+                      <ProductThumbnail
+                        name={match.product.name}
+                        departmentName={item.departmentName}
+                        size={22}
+                      />
+                      <AppText
+                        variant="caption"
+                        color="textSecondary"
+                        numberOfLines={1}
+                        style={styles.matchName}>
+                        {match.product.name}
+                      </AppText>
+                    </View>
                   ))}
                   {item.matches.length > 4 ? (
                     <AppText variant="caption" color="textTertiary">
@@ -275,6 +283,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   matches: {
-    gap: 2,
+    gap: 4,
+  },
+  matchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  matchName: {
+    flex: 1,
   },
 });
